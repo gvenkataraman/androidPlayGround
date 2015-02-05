@@ -1,0 +1,4 @@
+Implementation almost directly from:
+https://www.codeofaninja.com/2013/11/android-autocompletetextview-example-sqlite-database.html
+
+Db was replaced by list
