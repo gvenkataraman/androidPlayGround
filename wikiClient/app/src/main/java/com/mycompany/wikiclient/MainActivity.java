@@ -40,7 +40,9 @@ public class MainActivity extends Activity {
             Arrays.asList("united states", "india", "mexico", "ireland", "sri lanka"));
 
     private Map<String, String> postalCodeToCityName;
-    PatriciaTrie<String, String> trie = new PatriciaTrie<String, String>(new CharSequenceKeyAnalyzer());
+    PatriciaTrie<String, String> postalCodeTrie = new PatriciaTrie<String, String>(new CharSequenceKeyAnalyzer());
+    PatriciaTrie<String, String> cityTrie = new PatriciaTrie<String, String>(new CharSequenceKeyAnalyzer());
+    PatriciaTrie<String, String> stateTrie = new PatriciaTrie<String, String>(new CharSequenceKeyAnalyzer());
 
     public List<String> getItemList() {
         return itemList;
@@ -57,7 +59,6 @@ public class MainActivity extends Activity {
             // instantiate database handler
             itemList = new ArrayList<String>();
             postalCodeToCityName = new HashMap<String, String>();
-
             // put sample data to database
             //insertSampleData();
             insertDataFromFile();
@@ -84,18 +85,29 @@ public class MainActivity extends Activity {
      * File is assumed to be csv, with postal_code, city name format
      */
     public void insertDataFromFile() throws IOException {
-        //int resourceId = getResources().getIdentifier("cities", "raw", getPackageName());
         InputStream inputStream = getResources().openRawResource(R.raw.city_zip);
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
         String line;
         Log.i(TAG, "loading file ...");
+        long startTime = System.currentTimeMillis();
         while ((line = reader.readLine()) != null) {
             String[] words = line.split(",");
             StringBuilder sb = new StringBuilder(words[0]).append("  -  ").append(words[1]).append(", ").append(words[2]);
             postalCodeToCityName.put(words[0], words[1]);
-            trie.put(words[0], sb.toString());
+            postalCodeTrie.put(words[0], sb.toString());
+            String cityState = words[1].toLowerCase() + ", " + words[2] + " in cities";
+            cityTrie.put(words[1].toLowerCase(), cityState);
             itemList.add(words[0]);
         }
+        // store states
+        inputStream = getResources().openRawResource(R.raw.us_states);
+        reader = new BufferedReader(new InputStreamReader(inputStream));
+        while ((line = reader.readLine()) != null) {
+            stateTrie.put(line, line + " in states");
+        }
+        long endTime = System.currentTimeMillis();
+        long totalTimeInMs = endTime - startTime;
+        Log.i(TAG, "Total time taken to load data: " + totalTimeInMs + " ms");
         Log.i(TAG, "Finished loading file");
     }
 
@@ -131,12 +143,27 @@ public class MainActivity extends Activity {
     }
 
     public String[] getItemsFromTrie(String searchTerm) {
-        Map<String, String> itemsFromTrie = trie.getPrefixedBy(searchTerm);
+        long startTime = System.currentTimeMillis();
+        Map<String, String> itemsFromTrie = postalCodeTrie.getPrefixedBy(searchTerm);
         List<String> matches = new ArrayList<String>();
         for (Map.Entry<String, String> stringStringEntry : itemsFromTrie.entrySet()) {
             matches.add(stringStringEntry.getValue());
         }
-        return convertListToArray(matches);
+        // now look for states
+        itemsFromTrie = stateTrie.getPrefixedBy(searchTerm);
+        for (Map.Entry<String, String> stringStringEntry : itemsFromTrie.entrySet()) {
+            matches.add(stringStringEntry.getValue());
+        }
+        // cities
+        itemsFromTrie = cityTrie.getPrefixedBy(searchTerm);
+        for (Map.Entry<String, String> stringStringEntry : itemsFromTrie.entrySet()) {
+            matches.add(stringStringEntry.getValue());
+        }
+        String[] outputArray = convertListToArray(matches);
+        long endTime = System.currentTimeMillis();
+        long totalTimeInMs = endTime - startTime;
+        Log.i(TAG, "Total time taken to service request: " + totalTimeInMs + " ms");
+        return outputArray;
     }
 
 
